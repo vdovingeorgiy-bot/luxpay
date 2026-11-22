@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>LuxPay - Пополнение Steam</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Alex+Brush&family=Inter:wght@300;400;600;800&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Базовые настройки */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            background-color: #000;
+            overflow-x: hidden;
+        }
+
+        body {
+            background-color: #000000;
+            background-image: radial-gradient(circle at 50% 50%, rgba(20, 20, 20, 1) 0%, rgba(0, 0, 0, 1) 100%);
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            
+            color: #ffffff;
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 40px 20px 0 20px;
+            position: relative;
+        }
+
+        /* --- КАНВАС ДЛЯ ЧАСТИЦ (ФОН) --- */
+        #particle-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0; 
+            pointer-events: none; 
+        }
+
+        /* Контейнер для контента */
+        .container {
+            width: 100%;
+            max-width: 1100px; 
+            position: relative;
+            z-index: 10; 
+        }
+
+        /* Шапка сайта */
+        .header {
+            margin-bottom: 40px;
+            text-align: left;
+        }
+
+        /* --- ТЕКСТ И ЛОГОТИП --- */
+        .header-top {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            letter-spacing: 6px; 
+            font-size: 20px;     
+            font-weight: 800;    
+            color: #ffffff;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+            text-shadow: 0px 4px 20px rgba(0, 0, 0, 0.9);
+            
+            display: flex;
+            align-items: center;
+            gap: 15px; 
+            white-space: nowrap; 
+        }
+
+        /* --- Крутящийся логотип (против часовой стрелки) --- */
+        .spinning-logo {
+            width: 35px;  
+            height: 35px;
+            flex-shrink: 0;
+            animation: spin 8s linear infinite reverse; 
+            filter: invert(1) drop-shadow(0px 2px 5px rgba(0, 0, 0, 0.8));
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        /* ---------------------------------------- */
+
+        .header-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 70px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            line-height: 1;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            text-shadow: 0px 4px 20px rgba(0, 0, 0, 0.8);
+        }
+
+        .header-subtitle {
+            font-family: 'Playfair Display', serif;
+            font-style: italic;
+            font-size: 18px;
+            color: #eeeeee;
+            letter-spacing: 1px;
+            text-shadow: 0px 4px 10px rgba(0, 0, 0, 0.8);
+        }
+
+        /* Сетка контента */
+        .payment-layout {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr; 
+            gap: 20px;
+            align-items: start;
+        }
+
+        /* --- ЛЕВАЯ КОЛОНКА --- */
+        .left-side {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .input-box {
+            background-color: rgba(15, 15, 15, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+        }
+
+        .label-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .label-text {
+            font-size: 15px;
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        /* Всплывающая подсказка */
+        .tooltip-container {
+            position: relative;
+            font-size: 13px;
+            color: #cccccc;
+            cursor: help;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: color 0.3s;
+        }
+
+        .tooltip-container:hover {
+            color: #ffffff;
+        }
+
+        .tooltip-container:hover .tooltip-box {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .tooltip-box {
+            visibility: hidden;
+            opacity: 0;
+            width: 320px;
+            background-color: #1a1a1a;
+            color: #fff;
+            text-align: left;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 15px;
+            position: absolute;
+            z-index: 100;
+            bottom: 150%;
+            right: 0;
+            font-size: 12px;
+            line-height: 1.2; 
+            transition: opacity 0.3s;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.9);
+            font-weight: 400;
+            white-space: normal; 
+        }
+
+        .tooltip-box::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            right: 20px;
+            border-width: 6px;
+            border-style: solid;
+            border-color: #1a1a1a transparent transparent transparent;
+        }
+
+        /* Поля ввода */
+        input[type="text"], 
+        input[type="number"] {
+            width: 100%;
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        /* УБИРАЕМ СТРЕЛОЧКИ У ЧИСЛОВОГО ПОЛЯ */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+
+        input[type="text"]:focus, 
+        input[type="number"]:focus {
+            border-color: #888;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        input::placeholder {
+            color: #555;
+        }
+
+        /* Регион */
+        .region-btn {
+            background-color: #ffffff;
+            color: #000000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        /* Блок с суммой */
+        .amount-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 15px;
+        }
+
+        .amount-col {
+            flex: 1; 
+            min-width: 0; 
+        }
+
+        .total-col {
+            text-align: right;
+            white-space: nowrap;
+            flex-shrink: 0; 
+        }
+
+        .total-col .tooltip-container {
+            justify-content: flex-end;
+        }
+
+        .total-price {
+            font-size: 32px; 
+            font-weight: 700;
+            font-family: 'Playfair Display', serif;
+            margin-top: 5px;
+            letter-spacing: -0.5px; 
+        }
+
+        /* --- ПРАВАЯ КОЛОНКА (ЧЕК) --- */
+        .right-side {
+            background-color: rgba(10, 10, 10, 0.9); 
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100%;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+        }
+
+        .receipt-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .receipt-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            color: #aaaaaa;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .receipt-row:last-of-type {
+            border-bottom: none;
+            margin-bottom: 25px;
+        }
+
+        .receipt-row span:last-child {
+            color: #fff;
+            font-weight: 600;
+            text-align: right;
+        }
+
+        .account-placeholder {
+            color: #ffffff !important;
+            text-decoration: underline;
+            text-decoration-color: #555;
+            text-underline-offset: 4px;
+            cursor: pointer;
+        }
+
+        .account-filled {
+            color: #fff !important;
+            font-family: 'Playfair Display', serif;
+            font-size: 16px;
+        }
+
+        /* Промокод */
+        .promo-container {
+            display: flex;
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            margin-bottom: 25px;
+            overflow: hidden;
+            transition: border-color 0.3s;
+        }
+
+        .promo-container:focus-within {
+            border-color: #888;
+        }
+
+        .promo-container input {
+            border: none;
+            background: transparent;
+            padding: 12px 15px;
+            font-size: 14px;
+            flex: 1;
+            color: #fff;
+            outline: none;
+        }
+
+        .promo-container input::placeholder {
+            color: #888;
+        }
+
+        .promo-container button {
+            background: transparent;
+            border: none;
+            color: #888;
+            padding: 0 15px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .promo-container button:hover {
+            color: #fff;
+        }
+
+        /* Кнопка оплаты */
+        .pay-btn {
+            background-color: #ffffff;
+            color: #000000;
+            border: none;
+            padding: 18px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.3s, transform 0.1s;
+            margin-top: auto;
+        }
+
+        .pay-btn:hover {
+            background-color: #cccccc;
+        }
+
+        .pay-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* FAQ секция */
+        .faq-section {
+            width: 100%;
+            margin-top: 60px;
+        }
+
+        .faq-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 28px;
+            margin-bottom: 20px;
+            font-weight: 700;
+            text-shadow: 0px 4px 10px rgba(0,0,0,0.8);
+        }
+
+        details {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 20px 0;
+            cursor: pointer;
+        }
+
+        summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            list-style: none;
+            font-size: 16px;
+            font-weight: 600;
+            outline: none;
+            text-shadow: 0px 2px 5px rgba(0,0,0,0.8);
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        summary::after {
+            content: "▼";
+            font-size: 12px;
+            color: #aaa;
+            transition: transform 0.3s;
+        }
+
+        details[open] summary::after {
+            transform: rotate(180deg);
+        }
+
+        .faq-content {
+            padding-top: 15px;
+            color: #dddddd;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-line;
+            text-shadow: 0px 2px 5px rgba(0,0,0,0.8);
+        }
+
+        /* --- БЛОК ПОДПИСИ --- */
+        .signature-container {
+            width: 100vw;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            margin-top: 60px;
+            padding: 0 20px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .signature-text {
+            font-family: 'Alex Brush', cursive;
+            font-size: clamp(5rem, 26vw, 32rem); 
+            line-height: 1.2; 
+            margin-bottom: 0;
+            padding-top: 20px; 
+            white-space: nowrap;
+            font-weight: 400;
+            color: #1a1a1a; 
+            opacity: 1; 
+            text-shadow: 0px 0px 20px rgba(0,0,0,0.8);
+        }
+
+        /* ===================================================== */
+        /* --- ПОДДЕРЖКА (ПРАВЫЙ ВЕРХНИЙ УГОЛ) --- */
+        /* ===================================================== */
+        .support-widget {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .support-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            background: transparent;
+            border: none;
+            color: #ffffff;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 12px;
+            font-family: 'Inter', sans-serif;
+            transition: background 0.3s;
+        }
+
+        .support-btn:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .support-icon {
+            width: 30px;
+            height: 30px;
+            filter: drop-shadow(0px 2px 6px rgba(0, 0, 0, 0.9));
+            transition: transform 0.3s;
+        }
+
+        .support-btn:hover .support-icon {
+            transform: scale(1.1);
+        }
+
+        .support-label {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #cccccc;
+            text-shadow: 0px 2px 6px rgba(0, 0, 0, 0.9);
+            transition: color 0.3s;
+        }
+
+        .support-btn:hover .support-label {
+            color: #ffffff;
+        }
+
+        /* Всплывающее окно поддержки */
+        .support-popup {
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            width: 320px;
+            background: rgba(15, 15, 15, 0.97);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.9);
+            text-align: left;
+
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-8px);
+            transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s;
+        }
+
+        .support-popup.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .support-popup::before {
+            content: "";
+            position: absolute;
+            bottom: 100%;
+            right: 24px;
+            border-width: 8px;
+            border-style: solid;
+            border-color: transparent transparent rgba(15, 15, 15, 0.97) transparent;
+        }
+
+        .support-popup-title {
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #ffffff;
+            margin-bottom: 14px;
+        }
+
+        .support-email {
+            display: block;
+            font-family: 'Playfair Display', serif;
+            font-size: 17px;
+            font-weight: 600;
+            color: #ffffff;
+            text-decoration: underline;
+            text-decoration-color: #555;
+            text-underline-offset: 5px;
+            margin-bottom: 14px;
+            word-break: break-all;
+            transition: text-decoration-color 0.3s, color 0.3s;
+        }
+
+        .support-email:hover {
+            text-decoration-color: #ffffff;
+            color: #ffffff;
+        }
+
+        .support-popup-text {
+            font-size: 13px;
+            line-height: 1.55;
+            color: #bbbbbb;
+        }
+
+        /* Адаптивность */
+        @media (max-width: 850px) {
+            .payment-layout {
+                grid-template-columns: 1fr;
+            }
+            .header-title {
+                font-size: 50px;
+            }
+            .header-top {
+                font-size: 16px;
+                letter-spacing: 4px;
+            }
+            .spinning-logo {
+                width: 30px;
+                height: 30px;
+            }
+            .tooltip-box {
+                right: -50px;
+                width: 280px;
+            }
+            .total-price {
+                font-size: 28px; 
+            }
+            .total-col .tooltip-box {
+                right: 0;
+            }
+
+            /* Поддержка на мобильных */
+            .support-widget {
+                top: 14px;
+                right: 14px;
+            }
+            .support-popup {
+                width: calc(100vw - 28px);
+                max-width: 320px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Канвас для космической пыли -->
+    <canvas id="particle-canvas"></canvas>
+
+    <!-- ================= ПОДДЕРЖКА ================= -->
+    <div class="support-widget" id="support-widget">
+        <button class="support-btn" id="support-btn" type="button" aria-label="Поддержка">
+            <svg class="support-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 13v-1a8 8 0 0 1 16 0v1"/>
+                <path d="M4 13h2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-5z"/>
+                <path d="M20 13h-2a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-5z"/>
+                <path d="M17 19v1a2 2 0 0 1-2 2h-2"/>
+            </svg>
+            <span class="support-label">Поддержка</span>
+        </button>
+
+        <div class="support-popup" id="support-popup">
+            <div class="support-popup-title">Поддержка</div>
+            <a href="mailto:luxpaysteam@gmail.com" class="support-email">luxpaysteam@gmail.com</a>
+            <div class="support-popup-text">
+                Напишите обращение или вопрос на эту почту, и мы ответим вам в течение 5 рабочих дней.
+            </div>
+        </div>
+    </div>
+    <!-- ============================================== -->
+
+    <!-- КОНТЕНТ -->
+    <div class="container">
+        
+        <header class="header">
+            <div class="header-top">
+                <!-- Иконка Steam -->
+                <img src="https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/steam.svg" class="spinning-logo" alt="Steam Logo">
+                Пополняй Стим на
+            </div>
+            <div class="header-title">LuxPay</div>
+            <div class="header-subtitle">Твой новый уровень</div>
+        </header>
+
+        <div class="payment-layout">
+            
+            <!-- ЛЕВАЯ КОЛОНКА -->
+            <div class="left-side">
+                
+                <div class="input-box">
+                    <div class="label-row">
+                        <span class="label-text">Зачислим на аккаунт</span>
+                        <div class="tooltip-container">
+                            <span style="font-size: 16px;">?</span> Как узнать логин
+                            <div class="tooltip-box">
+                                <div style="margin: 0; padding: 0;">
+                                    <b>В клиенте Steam на ПК:</b><br>
+                                    1. Откройте Steam.<br>
+                                    2. В правом верхнем углу нажмите на свой никнейм.<br>
+                                    3. Выберите пункт «Об аккаунте».<br>
+                                    4. Вверху страницы будет надпись «Аккаунт пользователя [ваш логин]» — это и есть ваш логин.
+                                </div>
+                                <div style="margin: 0; padding: 0;">
+                                    <b>В браузере:</b><br>
+                                    1. Зайдите на сайт Steam.<br>
+                                    2. Нажмите на никнейм в правом верхнем углу.<br>
+                                    3. Выберите «Об аккаунте».<br>
+                                    4. На странице увидите строку «Аккаунт пользователя [ваш логин]».
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <input type="text" id="login-input" placeholder="Введите логин" maxlength="28">
+                </div>
+
+                <div class="input-box">
+                    <div class="label-row" style="margin-bottom: 0;">
+                        <span class="label-text">Регион</span>
+                        <div class="region-btn">Россия</div>
+                    </div>
+                </div>
+
+                <div class="input-box">
+                    <div class="amount-row">
+                        <div class="amount-col">
+                            <span class="label-text">Будет зачислено</span>
+                            <input type="number" id="amount-input" placeholder="0" max="10000" style="margin-top: 10px;">
+                        </div>
+                        <div class="total-col">
+                            <div class="tooltip-container">
+                                <span style="font-size: 16px;">?</span> К оплате
+                                <div class="tooltip-box" style="width: 350px; right: 0; bottom: 150%;">
+                                    Сумма зачисления приблизительная.<br><br>
+                                    В сумму оплаты входят: курсовая разница при зачислении на счет Steam, комиссия компаний, оказывающих услуги пополнения.<br><br>
+                                    Сумма итогового пополнения может быть больше обозначенной, но не меньше её.
+                                </div>
+                            </div>
+                            <div class="total-price" id="amount-total">0 ₽</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ПРАВАЯ КОЛОНКА (ЧЕК) -->
+            <div class="right-side">
+                <div class="receipt-title">
+                    <span>Итого</span>
+                    <span id="receipt-total">0 ₽</span>
+                </div>
+                
+                <div class="receipt-row">
+                    <span>Зачислим на Steam</span>
+                    <span id="receipt-amount">0 ₽</span>
+                </div>
+                
+                <div class="receipt-row">
+                    <span>Комиссия и банковские издержки</span>
+                    <span id="receipt-commission">0 ₽</span>
+                </div>
+
+                <div class="receipt-row">
+                    <span>Регион</span>
+                    <span>Россия</span>
+                </div>
+                
+                <div class="receipt-row">
+                    <span>Аккаунт</span>
+                    <span id="receipt-account" class="account-placeholder">Введите логин</span>
+                </div>
+
+                <div class="promo-container">
+                    <input type="text" placeholder="Промокод">
+                    <button type="button">Применить</button>
+                </div>
+
+                <button class="pay-btn">
+                    <span>Оплатить</span>
+                    <span id="btn-total">0 ₽</span>
+                </button>
+            </div>
+
+        </div>
+
+        <!-- FAQ -->
+        <section class="faq-section">
+            <h2 class="faq-title">Частые вопросы</h2>
+            
+            <details>
+                <summary>Как это работает?</summary>
+                <div class="faq-content">Введите логин Steam. Не путайте с никнеймом. После оплаты деньги придут на ваш кошелёк Steam в течение 5-10 минут.</div>
+            </details>
+
+            <details>
+                <summary>Как узнать логин моего аккаунта в Steam?</summary>
+                <div class="faq-content">
+В клиенте Steam на ПК:
+1. Откройте Steam.
+2. В правом верхнем углу нажмите на свой никнейм — появится выпадающее меню.
+3. Выберите пункт «Об аккаунте».
+4. Вверху страницы будет надпись «Аккаунт пользователя [ваш логин]» — это и есть ваш логин. Его можно выделить мышкой и скопировать.
+
+В браузере (если авторизованы на сайте Steam):
+1. Зайдите на сайт Steam и убедитесь, что вы вошли в аккаунт.
+2. Нажмите на никнейм в правом верхнем углу. В выпадающем меню выберите «Об аккаунте».
+3. На странице увидите строку «Аккаунт пользователя [ваш логин]».
+                </div>
+            </details>
+
+            <details>
+                <summary>Как оплатить?</summary>
+                <div class="faq-content">К оплате принимаются карты, выпущенные на территории Российской Федерации.</div>
+            </details>
+
+            <!-- ========== НОВЫЕ ВКЛАДКИ ========== -->
+
+            <details>
+                <summary>Пользовательское соглашение</summary>
+                <div class="faq-content">
+1. Общие положения
+Настоящее Пользовательское соглашение регулирует порядок использования сервиса LuxPay (далее — «Сервис»). Используя Сервис, вы подтверждаете, что ознакомлены с условиями и принимаете их в полном объёме.
+
+2. Предмет соглашения
+Сервис предоставляет возможность пополнения баланса аккаунта Steam. Все операции проводятся на условиях предоплаты. Сервис не является представителем Valve Corporation или Steam.
+
+3. Права и обязанности сторон
+Пользователь обязуется указывать достоверные данные (логин Steam) и не использовать Сервис для противоправных действий. Сервис обязуется обеспечить конфиденциальность данных и своевременное зачисление средств.
+
+4. Ответственность
+Сервис не несёт ответственности за ошибки, допущенные пользователем при вводе логина, а также за задержки, вызванные работой платёжных систем или Steam. Возврат средств осуществляется в соответствии с действующим законодательством.
+
+5. Изменение условий
+Сервис вправе изменять условия соглашения, публикуя обновлённую версию на данной странице. Продолжение использования Сервиса означает согласие с изменениями.
+
+6. Контакты
+По всем вопросам обращайтесь по адресу: luxpaysteam@gmail.com.
+                </div>
+            </details>
+
+            <details>
+                <summary>Политика конфиденциальности</summary>
+                <div class="faq-content">
+1. Какие данные мы собираем
+Мы обрабатываем логин Steam, указанный вами для зачисления, а также технические данные (IP-адрес, тип браузера), необходимые для работы Сервиса.
+
+2. Цели обработки
+Данные используются исключительно для выполнения пополнения, связи с пользователем при необходимости и улучшения качества Сервиса. Мы не передаём данные третьим лицам, за исключением случаев, предусмотренных законом.
+
+3. Хранение и защита
+Мы принимаем организационные и технические меры для защиты персональных данных от несанкционированного доступа. Данные хранятся не дольше, чем это необходимо для целей обработки.
+
+4. Файлы cookie
+Сервис может использовать файлы cookie для корректной работы интерфейса. Вы можете отключить cookie в настройках браузера, однако это может повлиять на работу отдельных функций.
+
+5. Ваши права
+Вы вправе запросить информацию об обработке ваших данных, их уточнение или удаление, направив обращение на luxpaysteam@gmail.com. Мы ответим в течение 5 рабочих дней.
+
+6. Изменения политики
+Актуальная версия политики всегда доступна на данной странице. Продолжая пользоваться Сервисом, вы соглашаетесь с условиями обработки данных.
+                </div>
+            </details>
+
+            <!-- ========== КОНЕЦ НОВЫХ ВКЛАДОК ========== -->
+
+        </section>
+
+    </div>
+
+    <!-- Подпись -->
+    <div class="signature-container">
+        <div class="signature-text">Luxpay</div>
+    </div>
+
+    <!-- Логика цен -->
+    <script>
+        const loginInput = document.getElementById('login-input');
+        const amountInput = document.getElementById('amount-input');
+        
+        const amountTotalEl = document.getElementById('amount-total');
+        const receiptTotalEl = document.getElementById('receipt-total');
+        const receiptAmountEl = document.getElementById('receipt-amount');
+        const receiptCommissionEl = document.getElementById('receipt-commission');
+        const receiptAccountEl = document.getElementById('receipt-account');
+        const btnTotalEl = document.getElementById('btn-total');
+
+        function updatePrices() {
+            let amount = parseFloat(amountInput.value) || 0;
+
+            if (amount > 10000) {
+                amount = 10000;
+                amountInput.value = 10000; 
+            }
+            if (amount < 0) {
+                amount = 0;
+                amountInput.value = 0;
+            }
+
+            let commission = amount * 0.05; 
+            let total = amount + commission;
+
+            let formattedAmount = Math.round(amount) + ' ₽';
+            let formattedCommission = Math.round(commission) + ' ₽';
+            let formattedTotal = Math.round(total) + ' ₽';
+
+            amountTotalEl.textContent = formattedTotal;
+            
+            receiptAmountEl.textContent = formattedAmount;
+            receiptCommissionEl.textContent = formattedCommission;
+            receiptTotalEl.textContent = formattedTotal;
+            
+            btnTotalEl.textContent = formattedTotal;
+        }
+
+        function updateLogin() {
+            let login = loginInput.value.trim();
+            if (login === '') {
+                receiptAccountEl.textContent = 'Введите логин';
+                receiptAccountEl.className = 'account-placeholder';
+            } else {
+                receiptAccountEl.textContent = login;
+                receiptAccountEl.className = 'account-filled';
+            }
+        }
+
+        amountInput.addEventListener('input', updatePrices);
+        loginInput.addEventListener('input', updateLogin);
+
+        updatePrices();
+        updateLogin();
+    </script>
+
+    <!-- Логика поддержки -->
+    <script>
+        const supportBtn = document.getElementById('support-btn');
+        const supportPopup = document.getElementById('support-popup');
+
+        supportBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            supportPopup.classList.toggle('active');
+        });
+
+        // Закрытие при клике вне окна
+        document.addEventListener('click', function (e) {
+            if (!supportPopup.contains(e.target) && !supportBtn.contains(e.target)) {
+                supportPopup.classList.remove('active');
+            }
+        });
+
+        // Закрытие по Escape
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                supportPopup.classList.remove('active');
+            }
+        });
+    </script>
+
+    <!-- Логика космической пыли -->
+    <script>
+        const canvas = document.getElementById('particle-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+
+        const particleCount = 100; 
+        const particles = [];
+
+        for (let i = 0; i < particleCount; i++) {
+            particles.push({
+                x: Math.random() * width,
+                y: Math.random() * height,
+                size: Math.random() * 1.5 + 0.5, 
+                speedX: (Math.random() - 0.5) * 0.3, 
+                speedY: (Math.random() - 0.5) * 0.3, 
+                opacity: Math.random() * 0.5 + 0.1,  
+                fadeSpeed: Math.random() * 0.01 + 0.005 
+            });
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+
+            particles.forEach(p => {
+                p.x += p.speedX;
+                p.y += p.speedY;
+
+                p.opacity += p.fadeSpeed;
+                if (p.opacity > 0.7 || p.opacity < 0.1) {
+                    p.fadeSpeed = -p.fadeSpeed;
+                }
+
+                if (p.x < 0) p.x = width;
+                if (p.x > width) p.x = 0;
+                if (p.y < 0) p.y = height;
+                if (p.y > height) p.y = 0;
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 255, 255, ${p.opacity})`;
+                ctx.fill();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        });
+    </script>
+</body>
+</html>
